@@ -1,0 +1,52 @@
+#!groovy
+
+import hudson.security.*
+import jenkins.model.*
+
+def instance = Jenkins.getInstance()
+def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+def users = hudsonRealm.getAllUsers()
+users_s = users.collect { it.toString() }
+
+// Create the admin user account if it doesn't already exist.
+if ("{{ jenkins_admin_username }}" in users_s) {
+    println "Admin user already exists - updating password"
+
+    def user = hudson.model.User.get('{{ jenkins_admin_username }}')
+    def password = hudson.security.HudsonPrivateSecurityRealm.Details.fromPlainPassword('{{ jenkins_admin_password }}')
+    user.addProperty(password)
+    user.save()
+}
+else {
+    println "--> creating local admin user"
+
+    hudsonRealm.createAccount('{{ jenkins_admin_username }}', '{{ jenkins_admin_password }}')
+    instance.setSecurityRealm(hudsonRealm)
+
+    def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+    instance.setAuthorizationStrategy(strategy)
+    instance.save()
+}---
+
+jenkins_package_state: present
+jenkins_connection_retries: 60
+jenkins_connection_delay: 5
+jenkins_jar_location: /opt/jenkins-cli.jar
+jenkins_options: ""
+jenkins_java_options: "-Djenkins.install.runSetupWizard=false"
+jenkins_url_prefix: ""
+jenkins_http_port: 8080
+
+
+jenkins_init_changes:
+  - option: "JENKINS_OPTS"
+    value: "{{ jenkins_options }}"
+  - option: "JAVA_OPTS"
+    value: "{{ jenkins_java_options }}"
+  - option: "JENKINS_HOME"
+    value: "{{ jenkins_home }}"
+  - option: "JENKINS_PREFIX"
+    value: "{{ jenkins_url_prefix }}"
+  - option: "JENKINS_PORT"
+    value: "{{ jenkins_http_port }}"
+
